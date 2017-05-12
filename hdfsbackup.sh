@@ -16,6 +16,7 @@ CONFIG_DIR="/etc/hdfsbackup"
 INCLUDES_FILE="${CONFIG_DIR}/includes.cfg"
 CONFIG_FILE="${CONFIG_DIR}/config.cfg"
 LOG_LEVEL=info # debug, info, error
+LOCK_FILE=/var/run/hdfsbackup.lock
 
 ###
 # MAIN, DO NOT CHANGE!
@@ -48,6 +49,19 @@ fi
 
 source ${CONFIG_FILE}
 
+if [ -f ${LOCK_FILE} ]; then
+  if [ $(cat ${LOCK_FILE}) -eq $$ ]; then
+    log_error "A backup is already running with pid $(cat ${LOCK_FILE})"
+  fi
+  
+  log_info "A lock file exists but no backup is running"
+  echo $$ > ${LOCK_FILE}
+  
+  if [ $? -gt 0 ]; then
+    log_error "Error: could not create lock file, exiting"
+  fi
+fi
+
 if [ ! -f ${INCLUDES_FILE} ]; then
   log_error "Error: includes not found in ${INCLUDES_FILE}, exiting"
 fi
@@ -71,5 +85,7 @@ for file in $(cat ${INCLUDES_FILE}); do
 done
 
 log_info "Backup finished"
+
+rm -f ${LOCK_FILE}
 
 exit 0
