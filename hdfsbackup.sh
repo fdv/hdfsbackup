@@ -17,6 +17,14 @@ INCLUDES_FILE="${CONFIG_DIR}/includes.cfg"
 CONFIG_FILE="${CONFIG_DIR}/config.cfg"
 LOG_LEVEL=info # debug, info, error
 LOCK_FILE=/var/run/hdfsbackup.lock
+HOURLY_BACKUPS=4
+DAILY_BACKUPS=7
+WEEKLY_BACKUPS=4
+MONTHLY_BACKUPS=12
+HOURLY_DIR=hourly
+DAILY_DIR=daily
+WEEKLY_DIR=weekly
+MONTHLY_DIR=monthly
 
 ###
 # MAIN, DO NOT CHANGE!
@@ -37,6 +45,37 @@ function log_info() {
 function log_error() {
   ${LOGGER_BIN} -t "hdfsbackup" -s -p ${SYSLOG_ERROR} "${1}"
   exit 1
+}
+
+function clean_oldest_backup() {
+  backup_dir=${1}
+  retention=${2}
+  oldest=$(( $retention - 1 ))
+  
+  log_debug "Removing oldest ${backup_dir} backup"
+  
+  ${HDFS_BIN} ls -h ${BACKUP_DIR}/${backup_dir}.${oldest} 2> /dev/null
+  if [ ?$ -eq 0 ]; then
+    ${HDFS_BIN} rm -rf ${BACKUP_DIR}/${backup_dir}.${oldest}
+    
+    if [ $? -gt 0 ]; then
+      log_error "Removing ${BACKUP_DIR}/${backup_dir}.${oldest} failed, exiting"
+    fi
+  fi
+  
+  log_debug "Finished removing oldest ${backup_dir} backup"
+}
+
+function rotate_backups() {
+  backup_dir=${1}
+  retention=${2}
+  oldest_possible=$(( $retention - 1 ))
+  oldest_existing=$(( $oldest_possible - 1 ))
+  
+  for backup in {$oldest_existing..0}; do
+    newoldest=$(( $backup + 1 ))
+    ${HDFS_BIN} mv ${BACKUP_DIR}/${backup_dir}.${backup} ${BACKUP_DIR}/${backup_dir}.${newoldest}
+  done    
 }
 
 if [ ${1} ]; then
@@ -78,9 +117,49 @@ if [ $? != 0 ]; then
   log_error "Error: can't create backup directory ${BACKUP_DIR}, exiting"
 fi
 
+# Here we do the rolling stuff
+
+# Is it the first rotation of the day?
+first_daily=0
+if [ $(( $(date +%k) - (( 24 / ${HOURLY_BACKUPS} )) )) -lt ${HOURLY_BACKUPS} ]; then
+  first_daily=1
+fi
+
+# Monthly rotation:
+# first of the mont
+# during the first rotation
+if [ $(date +%e ) -eq 1 ] && [ ${first_daily} -eq 1 ]; then
+  clean_oldest_backup ${MONTHLY_DIR} ${MONTHLY_BACKUPS}
+  rotate_backups ${MONTHLY_DIR} ${MONTHLY_BACKUPS}
+  ${HDFS_BIN} mv ${BACKUP_DIR}/${WEEKLY_DIR}.$(( ${WEEKLY_BACKUPS} - 1 )) ${BACKUP_DIR}/${MONTHLY_DIR}.0
+fi
+
+# Weekly rotatopm
+# sunday
+# during the first rotation
+if [ $(date +%w) -eq 0 ] && [ ${first_daily} -eq 1 ]; then
+  rotate_backups ${WEEKLY_DIR} ${WEEKLY_BACKUPS}
+  ${HDFS_BIN} mv ${BACKUP_DIR}/${DAILY_DIR}.$(( ${DAILY_BACKUPS} - 1 )) ${BACKUP_DIR}/${WEEKLY_DIR}.0
+fi
+  
+# Daily
+# daily.0 is the oldest hourly but only once a day
+# check if current hour < 0 + (24 / number of rotations)
+# if yes, do the daily rotation
+
+if [ ${first_daily} -eq 1 ]; then
+  rotate_backups ${DAILY_DIR} ${DAILY_BACKUPS}
+  ${HDFS_BIN} mv ${BACKUP_DIR}/${HOURLY_DIR}.$(( ${HOURLY_BACKUPS} - 1 )) ${BACKUP_DIR}/${DAILY_DIR}.0
+fi
+
+# Hourly
+rotate_backups ${HOURLY_DIR} ${HOURLY_BACKUPS}
+backup_destination=${BACKUP_DIR}/${HOURLY_DIR}.0
+${HDFS_BIN} mkdir -p ${backup_destination}
+
 for file in $(cat ${INCLUDES_FILE}); do
   log_debug "Starting to backup ${file}"
-  ${HDFS_BIN} put ${file} ${BACKUP_DIR}/
+  ${HDFS_BIN} put "${file}" "${backup_destination}/"
   log_debug "Finished to process ${file}"
 done
 

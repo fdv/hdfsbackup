@@ -12,3 +12,9 @@ Usage:
 ```
 ./hdfsbackup.sh [/path/to/config.cfg]
 ```
+
+Or in a crontab (better for rotation):
+
+```
+0 */4 * * * ./hdfsbackup.sh [/path/to/config.cfg]
+```
