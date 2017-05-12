@@ -38,8 +38,8 @@ function log_error() {
   exit 1
 }
 
-if [ ! -f ${INCLUDES_FILE} ]; then
-  log_error "Error: includes not found in ${INCLUDES_FILE}, exiting"
+if [ ${1} ]; then
+  CONFIG_FILE=${1}
 fi
 
 if [ ! -f ${CONFIG_FILE} ]; then
@@ -48,7 +48,11 @@ fi
 
 source ${CONFIG_FILE}
 
-if [ ! -z ${HDFS_BIN} ] || [ ! -x ${HDFS_BIN} ]; then
+if [ ! -f ${INCLUDES_FILE} ]; then
+  log_error "Error: includes not found in ${INCLUDES_FILE}, exiting"
+fi
+
+if [ -z "${HDFS_BIN}" ] || [ ! -x ${HDFS_BIN} ]; then
   log_error "Error: hdfs missing or not executable, exiting"
 fi
 
