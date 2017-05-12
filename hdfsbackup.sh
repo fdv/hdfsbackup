@@ -38,10 +38,6 @@ function log_error() {
   exit 1
 }
 
-if [ ! -z ${HDFS_BIN} ] || [ ! -x ${HDFS_BIN} ]; then
-  log_error "Error: hdfs missing or not executable, exiting"
-fi
-
 if [ ! -f ${INCLUDES_FILE} ]; then
   log_error "Error: includes not found in ${INCLUDES_FILE}, exiting"
 fi
@@ -51,6 +47,10 @@ if [ ! -f ${CONFIG_FILE} ]; then
 fi
 
 source ${CONFIG_FILE}
+
+if [ ! -z ${HDFS_BIN} ] || [ ! -x ${HDFS_BIN} ]; then
+  log_error "Error: hdfs missing or not executable, exiting"
+fi
 
 log_info "Starting backup"
 
