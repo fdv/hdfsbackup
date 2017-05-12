@@ -10,5 +10,5 @@ The HDFS client is expected to be named gohdfs to avoid conflicts with the legit
 Usage:
 
 ```
-./hdfsbackup.sh
+./hdfsbackup.sh [/path/to/config.cfg]
 ```
