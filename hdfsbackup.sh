@@ -72,10 +72,14 @@ function rotate_backups() {
   oldest_possible=$(( retention - 1 ))
   oldest_existing=$(( oldest_possible - 1 ))
   
+  log_debug "Starting rotation from ${backup_dir} with a retention of ${retention}"
   for ((backup=oldest_existing; backup>=0 ; backup--)); do
     newoldest=$(( backup + 1 ))
+    log_debug "Moving ${BACKUP_DIR}/${backup_dir}.${backup} to ${BACKUP_DIR}/${backup_dir}.${newoldest}"
     ${HDFS_BIN} mv "${BACKUP_DIR}/${backup_dir}.${backup}" "${BACKUP_DIR}/${backup_dir}.${newoldest}"
+    log_debug "Finished moving ${BACKUP_DIR}/${backup_dir}.${backup} to ${BACKUP_DIR}/${backup_dir}.${newoldest}"
   done    
+  log_debug "Finished rotation from ${backup_dir} with a retention of ${retention}"
 }
 
 if [ "${1}" ]; then
@@ -123,23 +127,32 @@ fi
 first_daily=0
 if [ $(( $(date +%k) - (( 24 / HOURLY_BACKUPS )) )) -lt $(( HOURLY_BACKUPS / 24 + 1 )) ]; then
   first_daily=1
+  log_debug "First backup of the day"
 fi
 
 # Monthly rotation:
 # first of the mont
 # during the first rotation
 if [ $(date +%e ) -eq 1 ] && [ ${first_daily} -eq 1 ]; then
+  log_info "Starting monthly rotation"
+  log_debug "Cleaning the oldest monthly backup"
   clean_oldest_backup "${MONTHLY_DIR}" ${MONTHLY_BACKUPS}
+  log_debug "Rotating monthly backups"
   rotate_backups "${MONTHLY_DIR}" ${MONTHLY_BACKUPS}
+  log_debug "Moving the oldest weekly backup as the newest monthly backup"
   ${HDFS_BIN} mv "${BACKUP_DIR}/${WEEKLY_DIR}.$(( WEEKLY_BACKUPS - 1 ))" "${BACKUP_DIR}/${MONTHLY_DIR}.0"
+  log_info "Finished monthly rotation"
 fi
 
-# Weekly rotatopm
+# Weekly rotation
 # sunday
 # during the first rotation
 if [ $(date +%w) -eq 0 ] && [ ${first_daily} -eq 1 ]; then
+  log_info "Starting weekly rotation"
   rotate_backups "${WEEKLY_DIR}" ${WEEKLY_BACKUPS}
+  log_debug "Moving the oldest daily backup as the newest weekly backup"
   ${HDFS_BIN} mv "${BACKUP_DIR}/${DAILY_DIR}.$(( DAILY_BACKUPS - 1 ))" "${BACKUP_DIR}/${WEEKLY_DIR}.0"
+  log_info "Finished weekly rotation"
 fi
   
 # Daily
@@ -148,13 +161,18 @@ fi
 # if yes, do the daily rotation
 
 if [ ${first_daily} -eq 1 ]; then
+  log_info "Starting daily rotation"
   rotate_backups "${DAILY_DIR}" ${DAILY_BACKUPS}
+  log_debug "Moving the oldest hourly backup as the newest daily backup"
   ${HDFS_BIN} mv "${BACKUP_DIR}/${HOURLY_DIR}.$(( HOURLY_BACKUPS - 1 ))" "${BACKUP_DIR}/${DAILY_DIR}.0"
+  log_info "Finished daily rotation"
 fi
 
 # Hourly
+log_info "Starting the hourly rotation"
 rotate_backups "${HOURLY_DIR}" ${HOURLY_BACKUPS}
 backup_destination="${BACKUP_DIR}/${HOURLY_DIR}.0"
+log_debug "Creating the newest hourly backup directory"
 ${HDFS_BIN} mkdir -p "${backup_destination}"
 
 while IFS= read -r file
