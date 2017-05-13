@@ -18,3 +18,12 @@ Or in a crontab (better for rotation):
 ```
 0 */4 * * * ./hdfsbackup.sh [/path/to/config.cfg]
 ```
+
+If you're using a crontab, make sure you don't run more often than your hourly backup retention.
+
+Example: if you're keeping 4 hourly backups, run 4 times a day.
+
+## TODO
+
+- Add backup exclusion
+- See how to deal with symlinks as hdfs doesn't like them
