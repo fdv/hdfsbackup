@@ -25,6 +25,7 @@ HOURLY_DIR=hourly
 DAILY_DIR=daily
 WEEKLY_DIR=weekly
 MONTHLY_DIR=monthly
+JOBS=5
 
 ###
 # MAIN, DO NOT CHANGE!
@@ -64,6 +65,23 @@ function clean_oldest_backup() {
   fi
   
   log_debug "Finished removing oldest ${backup_dir} backup"
+}
+
+function run_backup() {
+  src="${1}"
+  dest="${2}"
+  
+  while true; do
+    if [ $(jobs -p | wc -l) -eq ${JOBS} ]; then
+      log_debug "Too many jobs running to process ${file}, waiting"
+      sleep 1
+    else
+      log_debug "Starting to backup ${file}"
+      ${HDFS_BIN} put "${src}" "${dest}/" &
+      return
+    fi
+  done
+
 }
 
 function rotate_backups() {
@@ -177,9 +195,7 @@ ${HDFS_BIN} mkdir -p "${backup_destination}"
 
 while IFS= read -r file
 do
-  log_debug "Starting to backup ${file}"
-  ${HDFS_BIN} put "${file}" "${backup_destination}/"
-  log_debug "Finished to process ${file}"
+  run_backup "${file}" "${backup_destination}"
 done < <(grep -v '^ *#' < "${INCLUDES_FILE}")
 
 log_info "Backup finished"
