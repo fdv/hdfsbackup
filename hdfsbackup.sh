@@ -11,7 +11,7 @@ SYSLOG_INFO="${SYSLOG_FACILITY}.info"
 SYSLOG_ERROR="${SYSLOG_FACILITY}.err"
 BACKUP_ROOT="/backups"
 BACKUP_HOSTDIR="${BACKUP_ROOT}/$(hostname -f | sed -E 'H;g;:t;s/(.*)(\n)(.*)(\.)(.*)/\1\4\5\2\3/;tt;s/\.(.*)\n/\1./')"
-BACKUP_DIR="${BACKUP_HOSTDIR}/$(date +%Y%m%d%H%M)"
+BACKUP_DIR="${BACKUP_HOSTDIR}"
 CONFIG_DIR="/etc/hdfsbackup"
 INCLUDES_FILE="${CONFIG_DIR}/includes.cfg"
 CONFIG_FILE="${CONFIG_DIR}/config.cfg"
@@ -121,7 +121,7 @@ fi
 
 # Is it the first rotation of the day?
 first_daily=0
-if [ $(( $(date +%k) - (( 24 / HOURLY_BACKUPS )) )) -lt ${HOURLY_BACKUPS} ]; then
+if [ $(( $(date +%k) - (( 24 / HOURLY_BACKUPS )) )) -lt $(( HOURLY_BACKUPS / 24 + 1 )) ]; then
   first_daily=1
 fi
 
