@@ -198,6 +198,8 @@ do
   run_backup "${file}" "${backup_destination}"
 done < <(grep -v '^ *#' < "${INCLUDES_FILE}")
 
+wait
+
 log_info "Backup finished"
 
 rm -f ${LOCK_FILE}
